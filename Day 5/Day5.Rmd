@@ -1,0 +1,66 @@
+---
+title: "Day 5 Notebook"
+output: html_notebook
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+library(dplyr)
+library(stringr)
+library(tidyverse)
+library(readr)
+library(collections)
+options(scipen = 999)
+```
+
+```{r}
+input<-"dabAcCaCBAcCcaDA" ## Sample
+```
+
+
+## Part 1
+
+First - create the the vector of things that can react
+```{r}
+### possible reactions
+polaropposites<-c(sapply(1:26,function(x){c(str_c(letters[x],LETTERS[x]))}),
+                  sapply(1:26,function(x){c(str_c(LETTERS[x],letters[x]))}))
+### the regex
+polaroppositesre<-str_flatten(polaropposites,collapse="|")
+
+```
+
+Quick function called "react" which takes in a polymer and removes the units that destroy themselves
+
+```{r}
+react<-function(s){
+  while(any(str_detect(s,polaropposites))){
+    #cat(nchar(s),"\n")
+    s<-str_remove_all(s,polaroppositesre)}
+nchar(s)}
+```
+
+
+```{r}
+react(input)
+```
+
+## Part 2
+first, create the removal strings
+```{r}
+polyremove<-sapply(1:26,function(x){str_c(letters[x],"|",LETTERS[x])})
+```
+
+Then, for each polymer, remove it and then react
+
+```{r}
+part2<-sapply(1:26,function(x){
+  y<-str_remove_all(input,polyremove[x])
+  y<-react(y)
+  cat(letters[x],"-",y,"\n")
+  y})
+part2
+part2<-min(part2)
+part2
+```
+

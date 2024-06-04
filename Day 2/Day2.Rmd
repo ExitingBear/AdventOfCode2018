@@ -1,0 +1,67 @@
+---
+title: "Day 2 Notebook"
+output: html_notebook
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+library(dplyr)
+library(stringr)
+library(tidyverse)
+library(readr)
+library(collections)
+options(scipen = 999)
+```
+
+```{r}
+input<-read_lines("Day2Sample.txt")
+
+```
+
+## Part 1
+
+Quick function to find if there are any doubles or triples in the BoxIDs - returns boolean vector
+
+```{r}
+twoandthree<-function(s){
+  s<-table(unlist(str_split(s,"")))
+c(2%in%s,3%in%s)}
+```
+
+```{r}
+part1<-sapply(input,twoandthree)
+sum(part1[1,])
+sum(part1[2,])
+sum(part1[1,])*sum(part1[2,])
+
+```
+## Part 2
+
+As there are only so many, just doing this one by force:
+
+
+```{r}
+i<-1
+j<-1
+stopit<-F
+### compare all the numbers
+while(i<length(input)&&!stopit){
+  j<-i+1
+  ### breakinto letters
+  one<-unlist(str_split(input[i],""))
+  while(j<=length(input)&&!stopit){
+    ### break the comparison into letters
+    two<-unlist(str_split(input[j],""))
+    ### find how many of those are not equal
+    ### as soon as just one not the same, stop
+    if(sum(one!=two)==1){stopit<-T
+    break}
+    j<-j+1}
+i<-i+1}
+### return the characters that are equal (in string form!)
+part2<-str_flatten(one[which(one==two)])
+part2
+```
+
+
+

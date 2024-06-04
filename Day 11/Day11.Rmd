@@ -1,0 +1,140 @@
+---
+title: "Day 11 Notebook"
+output: html_notebook
+---
+
+```{r setup, include=FALSE}
+library(ggplot2)
+library(reshape2)
+library(knitr)
+library(dplyr)
+library(stringr)
+library(tidyverse)
+library(readr)
+library(collections)
+options(scipen = 999)
+```
+
+
+## Part 1
+
+Find the rackIDs of a fuel cell, given its  x,y, and serial number
+
+```{r}
+powerlevel<-function(x,y,sn){
+  r<-x+10
+  pl<-r*y
+  pl<-pl+sn
+  pl<-pl*r
+  pl<-(pl%/%100)%%10
+  pl<-pl-5
+  pl}
+
+```
+
+```{r}
+samples<-list(c(3,5,8),c(122,79,57),c(217,196,39),c(101,153,71))
+sapply(samples,function(x){powerlevel(x[1],x[2],x[3])})
+```
+find the best 3x3 powerlevel in a matrix
+```{r}
+maxpl<-function(x,y,sn){
+  ## first, find the power levels
+  pldict<-dict()
+  for(i in 1:x){
+    for(j in 1:y){
+      pldict$set(paste(i,j),powerlevel(i,j,sn))}}
+  ## then find the one that is highest (there's probably a better way - but)
+  maxx<-0
+  maxy<-0
+  maxpl<- -46 ### the absolute worst it can get
+  
+  for(i in 1:(x-2)){
+    for(j in 1:(x-2)){
+      bigpl<-pldict$get(paste(i,j))+pldict$get(paste(i,j+1))+pldict$get(paste(i,j+2))+
+        pldict$get(paste(i+1,j))+pldict$get(paste(i+1,j+1))+pldict$get(paste(i+1,j+2))+
+        pldict$get(paste(i+2,j))+pldict$get(paste(i+2,j+1))+pldict$get(paste(i+2,j+2))
+      if(bigpl>maxpl){
+        maxx<-i
+        maxy<-j
+        maxpl<-bigpl}}}
+cat(maxpl,"\n")
+str_c(maxx,maxy,sep=",")}
+
+```
+
+```{r}
+samples<-list(c(300,300,18),c(300,300,42))
+sapply(samples,function(x){maxpl(x[1],x[2],x[3])})
+```
+```{r,eval=FALSE}
+part1<-maxpl(300,300,MYINPUT)
+part1
+```
+
+## Part 2
+
+
+Trying by creating a summed area table:
+
+```{r}
+summedareamaxpl<-function(x,y,sn){
+  ## first, find the power levels
+  pldict<-dict()
+  for(i in 1:x){
+    for(j in 1:y){
+      pldict$set(paste(i,j),powerlevel(i,j,sn))}}
+  cat("power levels complete \n")
+  ## then make the summed area table
+  sadict<-dict()
+  ### for each point
+  for(i in 1:x){
+    iline<-0
+    for(j in 1:y){
+      ### go through each point in their summed area
+      iline<-iline+pldict$get(paste(i,j))
+      sqsum<-iline
+      if(i>1){sqsum<-sqsum+sadict$get(paste((i-1),j))}
+      sadict$set(paste(i,j),sqsum)}}
+  cat("summed area table complete\n")
+  
+  ### find all sums
+  maxx<-0
+  maxy<-0
+  maxsqsz<-0
+  maxpl<- -x*y*5 ### the absolute worst it can get
+  
+  ### start with the biggest and work the way down
+  sqsize<-x
+  ##stop when it's impossible to bigger maxpl
+  while((sqsize^2)*5>maxpl){  
+    for(i in 1:(x-(sqsize-1))){
+      for(j in 1:(x-(sqsize-1))){
+#        cat(i,j,paste((i - 1), (j + sqsize - 1)),"\n")
+        ### find the summed area for that square at that size
+        if(i==1|j==1){a<-0}else(a<-sadict$get(paste((i-1),(j-1))))
+        if(i==1){b<-0}else(b<-sadict$get(paste((i-1),(j+sqsize-1))))
+        if(j==1){c<-0}else{c<-sadict$get(paste((i+sqsize-1),(j-1)))}
+        d<-sadict$get(paste((i+sqsize-1),(j+sqsize-1)))
+        bigpl<-d-b-c+a
+        if(bigpl>maxpl){
+          maxx<-i
+          maxy<-j
+          maxsqsz<-sqsize
+          maxpl<-bigpl}}}
+    sqsize<-sqsize-1
+    if(sqsize%%10==0){cat(sqsize,maxpl,"\n")}
+    }
+  cat(maxpl,"\n")
+  str_c(maxx,maxy,maxsqsz,sep=",")}
+```
+
+```{r}
+samples<-list(c(300,300,18),c(300,300,42))
+sapply(samples,function(x){summedareamaxpl(x[1],x[2],x[3])})
+```
+
+```{r,eval=FALSE}
+part2<-summedareamaxpl(300,300,MYINPUT)
+part2
+```

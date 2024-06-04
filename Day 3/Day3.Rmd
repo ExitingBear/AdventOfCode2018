@@ -1,0 +1,94 @@
+---
+title: "Day 3 Notebook"
+output: html_notebook
+---
+
+```{r setup, include=FALSE}
+library(ggplot2)
+library(reshape2)
+library(knitr)
+library(dplyr)
+library(stringr)
+library(tidyverse)
+library(readr)
+library(collections)
+options(scipen = 999)
+```
+
+Data prep - put it into a data frame & create the blank matrix (which probably isn't that big as it is day 3)
+
+```{r}
+input<-read_lines("Day3Sample.txt")
+
+claims<-as.data.frame(matrix(ncol=5,nrow=0))
+for(i in 1:length(input)){
+  cl<-unlist(str_split(input[i]," @ |,|: |x"))
+  claims<-rbind(claims,cl)}
+colnames(claims)<-c("claim","xmargin","ymargin","xsize","ysize")
+claims$xmargin<-as.numeric(claims$xmargin)
+claims$ymargin<-as.numeric(claims$ymargin)
+claims$xsize<-as.numeric(claims$xsize)
+claims$ysize<-as.numeric(claims$ysize)
+fabric<-matrix(0,ncol=max(claims$xmargin)+max(claims$xsize),nrow=max(claims$ymargin)+max(claims$ysize))
+
+```
+
+## Part 1
+Just put every claim onto the fabric and see what happens
+
+```{r}
+fabricoverlay<-function(claims,fabric){
+
+for(i in 1:nrow(claims)){
+  cl<-claims[i,]
+  fabric[(cl$ymargin+1):(cl$ymargin+cl$ysize),
+         (cl$xmargin+1):(cl$xmargin+cl$xsize)]<-fabric[(cl$ymargin+1):(cl$ymargin+cl$ysize),
+                                                       (cl$xmargin+1):(cl$xmargin+cl$xsize)]+1}
+fabric}
+
+p1<-fabricoverlay(claims,fabric)
+part1<-length(which(p1>1))
+part1
+```
+
+
+
+```{r,echo=FALSE}
+fabricgr<-melt(fabric)
+
+basicgraph<-ggplot(data=fabricgr,aes(x=Var2,y=Var1,fill=value))+
+  geom_tile()+
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.title.y = element_blank(),
+        axis.title.x = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        legend.position="none")+
+  scale_y_reverse()+
+  coord_fixed()
+basicgraph
+
+```
+## Part 2
+
+As there are only so many claims - check each one.  If that piece of fabric has only one claim, that's the "winner"
+
+```{r}
+nooverlap<-function(claims,fabric){
+  keepgoing<-TRUE
+  i<-1
+  while(keepgoing&&i<nrow(claims)){
+    cl<-claims[i,]
+    if(max(fabric[(cl$ymargin+1):(cl$ymargin+cl$ysize),
+         (cl$xmargin+1):(cl$xmargin+cl$xsize)])==1){keepgoing<-FALSE
+         break}
+    i<-i+1}
+claims$claim[i]}
+
+part2<-nooverlap(claims,p1)
+part2
+```
+
