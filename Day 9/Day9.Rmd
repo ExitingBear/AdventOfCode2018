@@ -1,0 +1,76 @@
+---
+title: "Day 9 Notebook"
+output: html_notebook
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+library(dplyr)
+library(stringr)
+library(tidyverse)
+library(readr)
+library(collections)
+options(scipen = 999)
+```
+
+
+## Part 1
+Apparently, I need to learn to use a double ended queue.
+
+Huh.
+
+
+
+```{r}
+marbles<-function(elves,highmarble){
+  scores<-rep(0,elves)
+  elfcircle<-deque()
+  elfcircle$push(0)
+  turn<-1
+  while(turn<=highmarble){
+    if(turn%%23==0){
+      ## find the scoring elf
+      scoringelf<-turn%%elves
+      if(scoringelf==0){scoringelf<-elves}
+      ## backup seven
+      for(i in 1:7){elfcircle$pushleft(elfcircle$pop())}
+      ## update the score
+      scores[scoringelf]<-scores[scoringelf]+elfcircle$pop()+turn     
+      ## move down one space
+      elfcircle$push(elfcircle$popleft())
+      ###
+    }else{
+      ##  put the marble where it goes
+      elfcircle$push(elfcircle$popleft())
+      elfcircle$push(turn)}
+    turn<-turn+1}
+  max(scores)}
+```
+
+
+```{r}
+marbles(1,25)
+```
+
+
+
+```{r}
+samples<-list(c(10,1618),c(13,7999),c(17,1104),c(21,6111),c(30,5807))
+sapply(samples,function(x){marbles(x[1],x[2])})
+```
+
+
+
+```{r,eval=FALSE}
+#part1<-marbles(MY INPUT)
+#part1
+```
+
+
+## Part 2
+
+```{r}
+#part2<-marbles(My INPUT * 100)
+#part2
+```
+

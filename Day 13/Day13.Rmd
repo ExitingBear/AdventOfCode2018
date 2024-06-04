@@ -1,0 +1,238 @@
+---
+title: "Day 13 Notebook"
+output: html_notebook
+---
+
+```{r setup, include=FALSE}
+library(ggplot2)
+library(reshape2)
+library(knitr)
+library(dplyr)
+library(stringr)
+library(tidyverse)
+library(readr)
+library(collections)
+options(scipen = 999)
+```
+
+```{r}
+#input<-read_lines("Day13Sample.txt")
+input<-read_lines("../../AoCData/AOC2018/Day13.txt")
+```
+
+## Part 1
+First read in the input
+
+
+```{r}
+maze<-dict()
+carlist<-list()
+for(i in 1:length(input)){
+  linei<-input[i]
+  for(j in 1:nchar(input[1])){
+    x<-str_sub(linei,j,j)
+    if(x %in% c("-","|","\\","/","+")){
+      maze$set(paste(j,i),x)}
+    if(x%in%c(">","<")){
+      maze$set(paste(j,i),"-")
+      if(x==">"){cr<-list(j,i,"E","L")
+      }else{cr<-list(j,i,"W","L")}
+      carlist<-c(carlist,list(cr))}
+    if(x%in%c("v","^")){
+      maze$set(paste(j,i),"|")
+      if(x=="v"){cr<-list(j,i,"S","L")
+      }else{cr<-list(j,i,"N","L")}
+      carlist<-c(carlist,list(cr))}}}
+
+```
+
+The function to move a car
+```{r}
+carmove<-function(c,m){
+  ##depends on the car's direction
+  nc<-c
+  switch(c[[3]],
+         "N"={
+           x<-m$get(paste(c[[1]],c[[2]]-1))
+           nc[[2]]<-c[[2]]-1
+           switch(x,
+                  "|"={},
+                  "\\"={nc[[3]]<-"W"},
+                  "/"={nc[[3]]<-"E"},
+                  "+"={switch(c[[4]],
+                              "L"={nc[[3]]<-"W"
+                              nc[[4]]<-"S"},
+                              "S"={nc[[4]]<-"R"},
+                              "R"={nc[[3]]<-"E"
+                              nc[[4]]<-"L"},
+                              cat("bad plus\n"))},
+                  cat("badN\n"))},
+         "S"={
+           x<-m$get(paste(c[[1]],c[[2]]+1))
+           nc[[2]]<-c[[2]]+1
+           switch(x,
+                  "|"={},
+                  "\\"={nc[[3]]<-"E"},
+                  "/"={nc[[3]]<-"W"},
+                  "+"={switch(c[[4]],
+                              "L"={nc[[3]]<-"E"
+                              nc[[4]]<-"S"},
+                              "S"={nc[[4]]<-"R"},
+                              "R"={nc[[3]]<-"W"
+                              nc[[4]]<-"L"},
+                              cat("bad plus\n"))},
+                  cat(nc[[1]],nc[[2]],"badS",x,"\n"))},
+         "E"={
+           x<-m$get(paste(c[[1]]+1,c[[2]]))
+           nc[[1]]<-c[[1]]+1
+           switch(x,
+                  "-"={},
+                  "\\"={nc[[3]]<-"S"},
+                  "/"={nc[[3]]<-"N"},
+                  "+"={switch(c[[4]],
+                              "L"={nc[[3]]<-"N"
+                              nc[[4]]<-"S"},
+                              "S"={nc[[4]]<-"R"},
+                              "R"={nc[[3]]<-"S"
+                              nc[[4]]<-"L"},
+                              cat("bad plus\n"))},
+                  cat("badE\n"))},
+         "W"={
+           x<-m$get(paste(c[[1]]-1,c[[2]]))
+           nc[[1]]<-c[[1]]-1
+           switch(x,
+                  "-"={},
+                  "\\"={nc[[3]]<-"N"},
+                  "/"={nc[[3]]<-"S"},
+                  "+"={switch(c[[4]],
+                              "L"={nc[[3]]<-"S"
+                              nc[[4]]<-"S"},
+                              "S"={nc[[4]]<-"R"},
+                              "R"={nc[[3]]<-"N"
+                              nc[[4]]<-"L"},
+                              cat("bad plus\n"))},
+                  cat("badW\n"))},
+         cat("bad direction\n"))
+  nc}
+```
+
+Check to see if any of the things are in the same place
+
+```{r}
+crashed<-function(crs,m){
+  ### first, sort the coordinates
+  sortcoord<-sapply(crs,function(x){
+    paste(sprintf("%03d",x[[2]]),sprintf("%03d",x[[1]]),sep=",")})
+  crs<-crs[order(sortcoord)]
+  i<-1
+  x<-NA
+  while(i<=length(crs)){
+    ## create a holder for crashed cars
+    crashed<-c()
+    ## move the car
+    crs[[i]]<-carmove(crs[[i]],m)
+    ## start checking for cars in the same place
+    j<-1
+    while(j<=length(crs)){
+      ## don't compare to itself
+      if(i==j){j<-j+1
+      ## if there is a crash, add the compare car to the crash list
+      next}else if(crs[[i]][[1]]==crs[[j]][[1]]&&crs[[i]][[2]]==crs[[j]][[2]]){
+        crashed<-c(crashed,j)}
+      j<-j+1}
+    ## if there is a crashed car, add the first car to it
+    if(length(crashed>0)){
+      x<-c(crs[[i]][[1]],crs[[i]][[2]])
+    break}
+    i<-i+1}
+  x}
+```
+
+```{r}
+findcrashes<-function(cr,m){
+  keepgoing<-TRUE
+  while(keepgoing){
+    ## move the cars - 
+    cr<-lapply(cr,function(x){carmove(x,m)})
+    ## see if anything crashed
+    crashq<-crashed(cr,m)
+    ## if so, stop, if not, keep going
+    if(!any(is.na(crashq))){keepgoing<-FALSE}}
+  ## adjust because it's 1 indexed
+  crashq<-crashq-c(1,1)
+  ## turn back to a string
+  str_c(crashq,collapse=",")}
+```
+
+
+```{r}
+findcrashes(carlist,maze)
+```
+## Part 2
+
+
+Takes in the car list, but removes any that have crashed
+
+```{r}
+avert<-function(crs,m){
+  ## first sort the cars in order vertical then horizontal
+  sortcoord<-sapply(crs,function(x){
+    paste(sprintf("%03d",x[[2]]),sprintf("%03d",x[[1]]),sep=",")})
+  crs<-crs[order(sortcoord)]
+  ### find and remove crashes
+  i<-1
+  while(i<=length(crs)){
+    ## create a holder for crashed cars
+    crashed<-c()
+    ## move the car
+    crs[[i]]<-carmove(crs[[i]],m)
+    ## start checking for cars in the same place
+    j<-1
+    while(j<=length(crs)){
+      ## don't compare to itself
+      if(i==j){j<-j+1
+      ## if there is a crash, add the compare car to the crash list
+      next}else if(crs[[i]][[1]]==crs[[j]][[1]]&&crs[[i]][[2]]==crs[[j]][[2]]){
+        crashed<-c(crashed,j)}
+      j<-j+1}
+    ## if there is a crashed car, add the first car to it
+    if(length(crashed>0)){
+      ## for debugging, give the crash coordinates
+      cat("crash at ",crs[[i]][[1]]-1,",",crs[[i]][[2]]-1)
+      crashed<-c(crashed,i)
+      ## remove all crashed cars
+      crs<-crs[-crashed]
+      ## if only one car left STOP RIGHT THERE
+     # if(length(crs)==1){return(crs)}
+    next}
+    i<-i+1}
+  crs}
+```
+
+
+```{r}
+avoidcrashes<-function(cr,m){
+  keepgoing<-TRUE
+  tick<-1
+  carcount<-length(cr)
+  while(keepgoing){
+    ### move and remove the cars
+    cr<-avert(cr,m)
+    ## if only one car left, stop
+    if(length(cr)==1){keepgoing<-FALSE}
+    if(length(cr)!=carcount){
+      cat(" at ",tick,"\n")
+      carcount<-length(cr)}
+    tick<-tick+1}
+  cr<-cr[[1]]
+  ## adjust for 0 index
+  cr<-c(cr[[1]],cr[[2]])-c(1,1)
+  ## turn to a string
+  str_c(cr,collapse=",")}
+```
+
+
+```{r}
+part2<-avoidcrashes(carlist,maze)
+part2
+```

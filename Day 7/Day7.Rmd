@@ -1,0 +1,133 @@
+---
+title: "Day 7 Notebook"
+output: html_notebook
+---
+
+```{r setup, include=FALSE}
+library(igraph)
+library(ggplot2)
+library(ggraph)
+library(reshape2)
+library(knitr)
+library(dplyr)
+library(stringr)
+library(tidyverse)
+library(readr)
+library(collections)
+options(scipen = 999)
+```
+
+```{r}
+input<-read_lines("Day7Sample.txt")
+#input<-read_lines("../../AoCData/AOC2018/Day7.txt")
+steporder<-matrix(nrow=0,ncol=2)
+for(x in 1:length(input)){
+  i<-unlist(str_split(str_remove_all(input[x],"Step | can begin.")," must be finished before step "))
+  steporder<-rbind(steporder,unname(i))}
+```
+## Part 1
+I'm going to overuse graphs - 
+```{r}
+stepgraph<-graph_from_edgelist(steporder,directed=TRUE)
+plot(stepgraph)
+
+```
+Peel off pieces of the graph that have no incoming neighbors until the graph is empty
+
+
+```{r}
+ordersteps<-function(gr){
+  finalorder<-c()
+  while(vcount(gr)>0){
+    nowvs<-sort(V(gr)$name)
+    i<-1
+    while(TRUE){
+      ### if no incoming neighbors
+      if(length(neighbors(gr,nowvs[i],mode=c("in")))==0){
+        ### add to the order
+        finalorder<-c(finalorder,nowvs[i])
+        ### remove from the graph
+
+        gr<-delete.vertices(gr,nowvs[i])
+
+        ### get out of the loop and start over again
+        break}
+      ### if not - add one to i
+    i<-i+1
+    if(i>30){break}}
+  }
+str_flatten(finalorder)}
+```
+
+```{r}
+part1<-ordersteps(stepgraph)
+part1
+```
+
+## Part 2
+I *think* I want it to be much like part 1, but with multiple elves and more rules
+
+
+```{r}
+multielf<-function(gr,elfnum){
+  ## set up graph - give everything "working=FALSE" & "starttime=0"
+  gr<-gr%>%set_vertex_attr("working", value = FALSE)%>%
+    set_vertex_attr("starttime", value = 0)
+##set up queues
+  waiting<-queue()
+  dropoff<-priority_queue()
+  ##set up elves - put in dropoff queue
+  ##elf will be list(elfname,past,working,timefinished)
+  for(i in 1:elfnum){
+    elf<-list(i,c(),NA,0)
+    dropoff$push(elf)}
+  ##while something is still to be dropped off
+  while(dropoff$size()>0){
+    e<-dropoff$pop()
+    ## if it has something to drop off, then
+    if(!is.na(e[[3]])){
+      cat("elf: ",e[[1]]," stop: ",e[[3]]," time: ",e[[4]],"\n")
+      ## add working to the list of pasts
+      e[[2]]<-c(e[[2]],e[[3]])
+      ## get the list of downstream from working and update their earliest possible start time
+      unblock<-neighbors(gr,e[[3]],mode=c("out"))
+      gr<-set_vertex_attr(gr,"starttime",unblock,e[[4]])
+      ## remove the finished from the graph
+      gr<-delete.vertices(gr,e[[3]])
+      ## remove the current working
+      e[[3]]<-NA}
+    waiting$push(e)
+    ### get the min of (number of elves in waiting &
+    waitingelves<-waiting$size()
+    ### number of ready (nothing in front of  it, not "in progress"working) steps )
+    couldgo<-names(which(sapply(adjacent_vertices(gr,V(gr),mode=c("in")),length)==0))
+    couldgo<-couldgo[which(vertex.attributes(gr,couldgo)$working==F)]
+    
+    pairoff<-min(length(couldgo),waitingelves)
+    ### if that number is greater than 0, then for the first X in each list do:
+    if(pairoff>0){
+      for(i in 1:pairoff){
+        mtch<-waiting$pop()
+        gr<-set_vertex_attr(gr,"working",couldgo[i],T)
+        mtch[[3]]<-couldgo[i]
+        t<-max(mtch[[4]],vertex.attributes(gr,couldgo[i])$starttime)
+        mtch[[4]]<-max(mtch[[4]],vertex.attributes(gr,couldgo[i])$starttime)+which(LETTERS==couldgo[i]) #+60
+        ### put the elf on the dropoff queue with a priority of -finish time
+        dropoff$push(mtch,-mtch[[4]])
+        cat("elf: ",mtch[[1]]," start: ",couldgo[i]," time: ",t,"\n")
+        }}}
+  
+waiting}
+```
+
+
+
+```{r}
+p2<-multielf(stepgraph,2)
+pp2<-p2$as_list()
+part2<-max(sapply(pp2,function(x){x[[4]][1]}))
+part2
+```
+
+
+

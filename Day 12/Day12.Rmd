@@ -1,0 +1,165 @@
+---
+title: "Day 12 Notebook"
+output: html_notebook
+---
+
+```{r setup, include=FALSE}
+library(reshape2)
+library(knitr)
+library(dplyr)
+library(stringr)
+library(tidyverse)
+library(readr)
+library(collections)
+options(scipen = 999)
+```
+
+```{r}
+#input<-read_lines("Day12Sample.txt")
+input<-read_lines("../../AoCData/AOC2018/Day12.txt")
+bl<-which(input=="")
+```
+
+## Part 1
+There are 31 (technically 32, but one is to not add a pot where there are no pots in the scanned region) possible replacements.  Putting each of those into the dictionary then just scanning across to get the new pot layout
+
+
+Look at the data
+```{r}
+potbook<-dict()
+for(i in (bl+1):length(input)){
+  x<-unlist(str_split(input[i]," =\\> "))
+  potbook$set(x[1],x[2])}
+
+potline<-str_remove(input[1],"initial state: ")
+#potbook$as_list()
+```
+
+```{r}
+potplacer<-function(s,d,reps){
+  ##make 0 the starting number
+  startnum<-0
+  ##add 4 dots to the beginning of the string and 4 dots to the end
+  r<-1
+  while(r<=reps){
+  s<-str_c("....",s,"....")
+  outs<-""
+  for(i in 1:(nchar(s)-4)){
+    potit<-str_sub(s,i,i+4)
+    if(d$has(potit)){potit<-d$get(potit)}else{potit<-"."}
+    outs<-str_c(outs,potit)}
+  hashends<-str_locate_all(outs,"#")[[1]][,1]
+  ## figure out where the lowest hash is
+  startnum<-startnum+hashends[1]-3
+  ## remove the side dots
+  s<-str_sub(outs,hashends[1],hashends[length(hashends)])
+  r<-r+1}
+  ### find the potsum
+  ps<-unlist(str_split(s,""))
+  ps<-sapply(1:length(ps),function(x){
+    if(ps[x]=="#"){y<-startnum+x-1}else{y<-0}
+    y})
+  sum(ps)}
+```
+
+```{r}
+part1<-potplacer(potline,potbook,20)
+part1
+```
+## Part 2
+
+Obviously, doing this 50 billion times is not going to work (I don't have 10 years.  I mean, I might, but I don't want to have 10 years).
+
+First, quick check to see if there's a nice cycle
+
+
+```{r}
+potplacer2<-function(s,d,reps){
+  ##make 0 the starting number
+  startnum<-0
+  ##add 4 dots to the beginning of the string and 4 dots to the end
+  r<-1
+  cyclecheck<-c()
+  while(r<=reps){
+  s<-str_c("....",s,"....")
+  outs<-""
+  for(i in 1:(nchar(s)-4)){
+    potit<-str_sub(s,i,i+4)
+    if(d$has(potit)){potit<-d$get(potit)}else{potit<-"."}
+    outs<-str_c(outs,potit)}
+  hashends<-str_locate_all(outs,"#")[[1]][,1]
+  ## figure out where the lowest hash is
+  startnum<-startnum+hashends[1]-3
+  ## remove the side dots
+  s<-str_sub(outs,hashends[1],hashends[length(hashends)])
+  r<-r+1
+  ### find the potsum
+  ps<-unlist(str_split(s,""))
+  ps<-sapply(1:length(ps),function(x){
+    if(ps[x]=="#"){y<-startnum+x-1}else{y<-0}
+    y})
+  cyclecheck<-c(cyclecheck,sum(ps))}
+  cyclecheck}
+```
+
+```{r}
+cc<-potplacer2(potline,potbook,1000)
+cc[1:200]
+```
+Then, taking a wild stab in the dark, see if this ever balances out -
+
+```{r}
+diff(cc)[1:200]
+```
+And weirdly enough, after 101 iterations, it stabilizes and adds a pot value of 59 every new iteration.
+so,
+(checking at random)
+
+```{r}
+testit<-sample(102:1000,20,replace=FALSE)
+lapply(testit,function(x){
+  a<-cc[101]+((x-101)*59) ## the formula that seems like it works
+  b<-cc[x] ## the actual
+  c<-b-a  ## the difference
+paste(a,b,c)})
+```
+
+Based on that - for 50000000000, the answer will be
+```{r}
+part2<-cc[101]+((50000000000-101)*59)
+part2
+```
+Also can be seen here (if I'd bothered to look first)
+
+```{r}
+potplacer3<-function(s,d,reps){
+  ##make 0 the starting number
+  startnum<-0
+  ##add 4 dots to the beginning of the string and 4 dots to the end
+  r<-1
+  while(r<=reps){
+  s<-str_c("....",s,"....")
+  outs<-""
+  for(i in 1:(nchar(s)-4)){
+    potit<-str_sub(s,i,i+4)
+    if(d$has(potit)){potit<-d$get(potit)}else{potit<-"."}
+    outs<-str_c(outs,potit)}
+  hashends<-str_locate_all(outs,"#")[[1]][,1]
+  ## figure out where the lowest hash is
+  startnum<-startnum+hashends[1]-3
+  ## remove the side dots
+  s<-str_sub(outs,hashends[1],hashends[length(hashends)])
+  if(r>95&&r<120){cat(startnum,s,"\n")}
+  r<-r+1}
+  ### find the potsum
+  ps<-unlist(str_split(s,""))
+  ps<-sapply(1:length(ps),function(x){
+    if(ps[x]=="#"){y<-startnum+x-1}else{y<-0}
+    y})
+  sum(ps)}
+```
+
+```{r}
+potplacer3(potline,potbook,120)
+```
+At a certain point, everything is just moving over one step to the right every time.

@@ -1,0 +1,145 @@
+---
+title: "Day 4 Notebook"
+output: html_notebook
+---
+
+```{r setup, include=FALSE}
+library(reshape2)
+library(knitr)
+library(dplyr)
+library(stringr)
+library(tidyverse)
+library(readr)
+library(collections)
+options(scipen = 999)
+```
+
+```{r}
+input<-read_lines("Day4Sample.txt")
+```
+
+```{r}
+guardframe<-as.data.frame(matrix(ncol=2,nrow=0))
+  for(i in 1:length(input)){
+    logline<-input[i]
+    logline<-unlist(str_split(str_sub(logline,start=2),"\\] "))
+    guardframe<-rbind(guardframe,c(logline))}
+colnames(guardframe)<-c("times","activities")
+guardframe$times<-as.POSIXct(guardframe$times)
+
+
+
+```
+
+
+```{r}
+minute(as.POSIXct(logline[1]))
+```
+
+## Part 1
+
+This is going to be messy, very messy
+
+First, a function that takes in a days schedule & sends out guard ID, # of minutes asleep, and the minutes asleep in string form
+```{r}
+beddybye<-function(logs){
+  logs<-logs%>%rowwise%>%mutate(mins=minute(times))
+  changemin<-logs$mins[-1]
+  minlist<-c()
+  if(length(changemin)>0){
+  for(i in seq(from=1,to=length(changemin),by=2)){minlist<-c(minlist,changemin[i]:(changemin[i+1]-1))}}
+  totalmin<-length(minlist)
+  minlist<-str_flatten(minlist,collapse=" ")
+  guard<-str_remove(logs$activities[1]," begins shift")
+c(guard,totalmin,minlist)}
+```
+
+Then a bigger function that takes in the guard data frame and spits out the answer to part 1
+
+```{r}
+sleepiestguard<-function(allguards){
+  ### as there is only one guard/night, putting it in chronological order will split the guards into chunks
+  ### would use group by day, but some of these guards start early... stupid guards
+  allguards<-allguards%>%rowwise%>%
+    arrange(times)%>%
+    mutate(ng=ifelse(str_detect(activities,"Guard"),TRUE,FALSE))
+  ### find the borders between the days
+  daysplit<-c(which(allguards$ng),nrow(allguards)+1)
+  ### create the aggregating dataframe
+  dailylog<-as.data.frame(matrix(nrow=0,ncol=3))
+  ### use the beddybye function to find out who has been sleeping & when
+  for(i in 1:(length(daysplit)-1)){
+    bb<-beddybye(allguards[daysplit[i]:(daysplit[i+1]-1),])
+    dailylog<-rbind(dailylog,bb)}
+  colnames(dailylog)<-c("guard","minutes","minlist")
+  dailylog <- dailylog%>% rowwise%>%
+    ### change minutes to numbers
+    mutate(minutes=as.numeric(minutes))%>%
+    ### group by guard
+    group_by(guard)%>%
+    ### for each guard get the total number of minutes & the list of specific minutes
+    summarise(totminutes=sum(minutes),whichmins=str_flatten(minlist,collapse=" "))%>% ungroup %>% 
+   ### get the guard with the most sleep
+    filter(totminutes==max(totminutes))
+  ### split up the minute list, make a frequency table
+  ### find the highest frequency
+  drowsiest<-sort(table(unlist(str_split(dailylog$whichmins," "))),decreasing=TRUE)[1]
+  ### return the guard's name & the drowsiest minute
+c(dailylog$guard,names(drowsiest))}
+```
+
+```{r}
+p1<-sleepiestguard(guardframe)
+p1
+### for part 1, strip the guard to their number & multiply by the sleepiest minute
+p1[1]<-str_remove(p1[1],"Guard #")
+part1<-prod(as.numeric(p1))
+part1
+```
+
+## Part 2
+Part 2 is very, very much like part 1, all the way up to building and summarizing the daily log.
+Instead of working with the total minutes, do the tabulation to find the sleepiest minute before narrowing down the guards
+
+```{r}
+sleepiestminute<-function(allguards){
+  ### as there is only one guard/night, putting it in chronological order will split the guards into chunks
+  ### would use group by day, but some of these guards start early... stupid guards
+  allguards<-allguards%>%rowwise%>%
+    arrange(times)%>%
+    mutate(ng=ifelse(str_detect(activities,"Guard"),TRUE,FALSE))
+  ### find the borders between the days
+  daysplit<-c(which(allguards$ng),nrow(allguards)+1)
+  ### create the aggregating dataframe
+  dailylog<-as.data.frame(matrix(nrow=0,ncol=3))
+  ### use the beddybye function to find out who has been sleeping & when
+  for(i in 1:(length(daysplit)-1)){
+    bb<-beddybye(allguards[daysplit[i]:(daysplit[i+1]-1),])
+    dailylog<-rbind(dailylog,bb)}
+  colnames(dailylog)<-c("guard","minutes","minlist")
+   dailylog <- dailylog%>% rowwise%>%
+     ### change minutes to numbers
+     mutate(minutes=as.numeric(minutes))%>%
+     ### group by guard
+     group_by(guard)%>%
+     ### for each guard get the total number of minutes & the list of specific minutes
+     summarise(totminutes=sum(minutes),whichmins=str_flatten(minlist,collapse=" "))%>% ungroup %>% rowwise%>%
+     ### split up the minute list, make a frequency table
+     ### find the highest frequency
+     mutate(drowsiestmin=names(sort(table(unlist(str_split(whichmins," "))),decreasing=TRUE)[1]),
+            drowsiestcount=sort(table(unlist(str_split(whichmins," "))),decreasing=TRUE)[1])%>%ungroup%>%
+     filter(drowsiestcount==max(drowsiestcount))
+   ### return the guard's name & the drowsiest minute
+c(dailylog$guard,dailylog$drowsiestmin)}
+```
+
+
+```{r}
+p2<-sleepiestminute(guardframe)
+p2
+### for part 1, strip the guard to their number & multiply by the sleepiest minute
+p2[1]<-str_remove(p2[1],"Guard #")
+part2<-prod(as.numeric(p2))
+part2
+```
+

@@ -1,0 +1,107 @@
+---
+title: "Day 8 Notebook"
+output: html_notebook
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+library(dplyr)
+library(stringr)
+library(tidyverse)
+library(readr)
+library(collections)
+options(scipen = 999)
+```
+
+```{r}
+input<-read_lines("Day8Sample.txt")
+licensefile<-as.numeric(unlist(str_split(input," ")))
+```
+
+## Part 1
+Hello Recursion
+
+I am unhappy with everything I am about to do.  I feel like I should be creating a tree - but I am not.  For reasons about which I am unclear.
+
+```{r}
+mdfinder<-function(n){
+  cat(n[1:2],"\n")
+  ### if there are NO subfolders, return the sum of the metadata and the remaining n.
+  if(n[1]==0){
+    ## get the number of md
+    mdnum<-n[2]
+    ## chop off the head of the numberlist
+    n<-n[-c(1,2)]
+    ## sum the mds
+    md<-sum(n[1:mdnum])
+    ## chop off the rest of the head of the numberlist
+    n<-n[-(1:mdnum)]
+    ## return the metatdata sum & the remainder of the numberlist
+  }else{
+    ## get number of children
+    children<-n[1]
+    ## get number of children
+    mdnum<-n[2]
+    n<-n[-c(1,2)]
+    md<-0
+    ## get the metadata for each child
+    for(i in 1:children){
+      ### run mdfinder
+      x<-mdfinder(n)
+      ### update n
+      n<-x[[2]]
+      md<-md+x[[1]]}
+    ## get its own metadata
+    md<-md+sum(n[1:mdnum])
+    n<-n[-(1:mdnum)]}
+  return(list(md,n))}
+```
+
+```{r}
+mdfinder(licensefile)
+```
+
+## Part 2
+This is actually going to be very similar - but instead of finding the metadata, find the value -
+```{r}
+valuefinder<-function(n){
+  cat(n[1:2],"\n")
+  ### if there are NO subfolders, return the sum of the metadata and the remaining n.
+  if(n[1]==0){
+    ## get the number of md
+    mdnum<-n[2]
+    ## chop off the head of the numberlist
+    n<-n[-c(1,2)]
+    ## sum the mds
+    val<-sum(n[1:mdnum])
+    ## chop off the rest of the head of the numberlist
+    n<-n[-(1:mdnum)]
+    ## return the metatdata sum & the remainder of the numberlist
+  }else{
+    ## get number of children
+    children<-n[1]
+    ## get number of children
+    mdnum<-n[2]
+    n<-n[-c(1,2)]
+    childval<-c()
+    ## get the values for each child
+    for(i in 1:children){
+      ### run mdfinder
+      x<-valuefinder(n)
+      ### update n
+      n<-x[[2]]
+      childval<-c(childval,x[[1]])}
+    ## find the child val
+    val<-n[1:mdnum]
+    val<-sapply(val,function(c){
+      c<-if(c>length(childval)){0
+      }else{childval[c]}
+      c})
+    val<-sum(val)
+    n<-n[-(1:mdnum)]}
+  return(list(val,n))}
+```
+
+```{r}
+valuefinder(licensefile)
+```
