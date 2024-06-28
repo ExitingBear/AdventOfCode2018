@@ -16,17 +16,16 @@ options(scipen = 999)
 ```
 
 ```{r}
-#input<-read_lines("Day13Sample.txt")
-input<-read_lines("../../AoCData/AOC2018/Day13.txt")
+input<-read_lines("Day13Sample2.txt")
 ```
 
 ## Part 1
-First read in the input
 
-
+Track/maze input in dictionary, car in a list
 ```{r}
 maze<-dict()
 carlist<-list()
+## cars are x,y,direction(NEWS),direction to go at next turn (LSR)
 for(i in 1:length(input)){
   linei<-input[i]
   for(j in 1:nchar(input[1])){
@@ -46,7 +45,7 @@ for(i in 1:length(input)){
 
 ```
 
-The function to move a car
+Moving a single car
 ```{r}
 carmove<-function(c,m){
   ##depends on the car's direction
@@ -116,8 +115,8 @@ carmove<-function(c,m){
   nc}
 ```
 
-Check to see if any of the things are in the same place
 
+crashed checks to see if anything has crashed - otherwise, returns the moved cars
 ```{r}
 crashed<-function(crs,m){
   ### first, sort the coordinates
@@ -125,10 +124,9 @@ crashed<-function(crs,m){
     paste(sprintf("%03d",x[[2]]),sprintf("%03d",x[[1]]),sep=",")})
   crs<-crs[order(sortcoord)]
   i<-1
-  x<-NA
+  ## create a holder for crashed cars
+  collision<-c()
   while(i<=length(crs)){
-    ## create a holder for crashed cars
-    crashed<-c()
     ## move the car
     crs[[i]]<-carmove(crs[[i]],m)
     ## start checking for cars in the same place
@@ -138,30 +136,30 @@ crashed<-function(crs,m){
       if(i==j){j<-j+1
       ## if there is a crash, add the compare car to the crash list
       next}else if(crs[[i]][[1]]==crs[[j]][[1]]&&crs[[i]][[2]]==crs[[j]][[2]]){
-        crashed<-c(crashed,j)}
+        collision<-c(collision,i,j)}
       j<-j+1}
     ## if there is a crashed car, add the first car to it
-    if(length(crashed>0)){
-      x<-c(crs[[i]][[1]],crs[[i]][[2]])
-    break}
     i<-i+1}
-  x}
+  if(length(collision>0)){
+    x<-crs[collision[1]]
+    crs<-c(x[[1]][[1]],x[[1]][[2]])}
+  crs}
 ```
 
+
+findcrashes repeatedly calls crashed until there's an answer. 
 ```{r}
 findcrashes<-function(cr,m){
   keepgoing<-TRUE
   while(keepgoing){
-    ## move the cars - 
-    cr<-lapply(cr,function(x){carmove(x,m)})
-    ## see if anything crashed
-    crashq<-crashed(cr,m)
+    ## move the cars - see if anything crashed
+    cr<-crashed(cr,m)
     ## if so, stop, if not, keep going
-    if(!any(is.na(crashq))){keepgoing<-FALSE}}
+    if(!is.list(cr)){keepgoing<-FALSE}}
   ## adjust because it's 1 indexed
-  crashq<-crashq-c(1,1)
+  cr<-cr-c(1,1)
   ## turn back to a string
-  str_c(crashq,collapse=",")}
+  str_c(cr,collapse=",")}
 ```
 
 
@@ -171,8 +169,7 @@ findcrashes(carlist,maze)
 ## Part 2
 
 
-Takes in the car list, but removes any that have crashed
-
+this moves all the cars a single tick
 ```{r}
 avert<-function(crs,m){
   ## first sort the cars in order vertical then horizontal
@@ -181,35 +178,42 @@ avert<-function(crs,m){
   crs<-crs[order(sortcoord)]
   ### find and remove crashes
   i<-1
+  crashed<-c()
   while(i<=length(crs)){
+    if(any(is.na(crs[[i]]))){
+      i<-i+1
+      next}
     ## create a holder for crashed cars
-    crashed<-c()
     ## move the car
     crs[[i]]<-carmove(crs[[i]],m)
     ## start checking for cars in the same place
     j<-1
     while(j<=length(crs)){
+      if(any(is.na(crs[[j]]))){
+        j<-j+1
+        next
       ## don't compare to itself
-      if(i==j){j<-j+1
+      }else if(i==j){j<-j+1
       ## if there is a crash, add the compare car to the crash list
       next}else if(crs[[i]][[1]]==crs[[j]][[1]]&&crs[[i]][[2]]==crs[[j]][[2]]){
-        crashed<-c(crashed,j)}
+        ## for debugging, give the crash coordinates
+        cat(i,j,"crash at ",crs[[i]][[1]]-1,",",crs[[i]][[2]]-1)
+        crashed<-c(crashed,i,j)
+        ### make i & j NA
+        crs[[i]]<-NA
+        crs[[j]]<-NA
+        ### there's no possibility for a three car pileup
+        break}
       j<-j+1}
-    ## if there is a crashed car, add the first car to it
-    if(length(crashed>0)){
-      ## for debugging, give the crash coordinates
-      cat("crash at ",crs[[i]][[1]]-1,",",crs[[i]][[2]]-1)
-      crashed<-c(crashed,i)
-      ## remove all crashed cars
-      crs<-crs[-crashed]
-      ## if only one car left STOP RIGHT THERE
-     # if(length(crs)==1){return(crs)}
-    next}
     i<-i+1}
+  if(length(crashed>0)){
+    ## remove all crashed cars
+    crs<-crs[-crashed]}
   crs}
 ```
 
 
+This repeatedly calls avert 
 ```{r}
 avoidcrashes<-function(cr,m){
   keepgoing<-TRUE

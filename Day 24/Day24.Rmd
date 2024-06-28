@@ -1,13 +1,9 @@
 ---
-title: "Day XX Notebook"
+title: "Day 24 Notebook"
 output: html_notebook
 ---
 
 ```{r setup, include=FALSE}
-library(igraph)
-library(ggplot2)
-library(rgl)
-library(ggraph)
 library(reshape2)
 library(knitr)
 library(dplyr)
@@ -18,33 +14,243 @@ library(collections)
 options(scipen = 999)
 ```
 
+
+
+##Part 1
+
+I can't think of a decent structure for this that makes any sense at all
+
 ```{r}
-input<-read_lines("DayXXSample.txt")
-#input<-read_lines("../../AoCData/AOC2018/DayXX.txt")
+#### Sample Data
+immsys<-as.data.frame(matrix(ncol=12,nrow=0))
+colnames(immsys)<-c("type","groupnum","units","hp","attack","damage","initiative","F","C","S","B","R")
+immsys<-rbind(immsys,
+              list(type="Imm",groupnum=1,units=17,hp=5390,attack=4507,damage="fire",initiative=2,F=1,C=1,S=1,B=2,R=2),
+              list(type="Imm",groupnum=2,units=989,hp=1274,attack=25,damage="slashing",initiative=3,F=0,C=1,S=2,B=2,R=1),
+              list(type="Inf",groupnum=1,units=801,hp=4706,attack=116,damage="bludgeoning",initiative=1,F=1,C=1,S=1,B=1,R=2),
+              list(type="Inf",groupnum=2,units=4485,hp=2961,attack=12,damage="slashing",initiative=4,F=2,C=2,S=1,B=1,R=0))
+immsys<-immsys %>% rowwise %>% mutate(typgrp=paste(type,groupnum,sep=""))%>%select(type,groupnum,typgrp,everything())
+```
+
+
+
+
+
+
+
+
+```{r}
+immunesystembattle<-function(everything){
+  ### while both teams still have groups
+  x<-1
+  while(all(c("Imm","Inf")%in%everything$type)&x<=Inf){
+  ### find effective power
+  everything <- everything %>% rowwise %>% mutate(ep=units*attack) %>%
+    ### sort by effective power
+    arrange(desc(ep),desc(initiative))%>%
+    ### add (or reset) target & attacker
+    mutate(target=NA,attacker="empty")
+  wc<-everything %>% filter(type=="Imm")%>%rowwise%>%arrange(desc(ep),desc(initiative))
+  virus<-everything%>%filter(type=="Inf")
+  ### work from top to bottom -  immune group first for no particular reason 
+  ### this will give everything a target (if applicable) & identify its attacker (if applicable)
+  for(i in 1:nrow(wc)){
+    if(any(virus$attacker=="empty")){
+      st<-selecttarget(wc[i,],virus)
+      virus<-st[[2]]
+      wc$target[i]<-st[[1]]}}
+  ### reorder virus
+  virus<-virus %>%rowwise%>%arrange(desc(ep),desc(initiative))
+  for(i in 1:nrow(virus)){
+    if(any(wc$attacker=="empty")){
+      st<-selecttarget(virus[i,],wc)
+      wc<-st[[2]]
+      virus$target[i]<-st[[1]]}}
+  ### rejoin the teams
+  everything <- rbind(virus,wc) %>% rowwise %>% arrange(desc(initiative)) %>% select(-dealt)
+  ### attack if units > 
+  for(i in 1:nrow(everything)){
+    ### if the group still has units & has a target
+    if(everything$units[i]>0&!is.na(everything$target[i])){
+      ### update ep in case this has been hit earlier in the round
+      ep<-everything$units[i]*everything$attack[i]
+      ### tg is the target line
+      tg<-which(everything$typgrp==everything$target[i])
+      ### alter ep depending on weakness & immunity
+      switch(everything$damage[i],
+             "fire"={ep<-ep*everything$F[tg]},
+             "bludgeoning"={ep<-ep*everything$B[tg]},
+             "cold"={ep<-ep*everything$C[tg]},
+             "slashing"={ep<-ep*everything$S[tg]},
+             "radiation"={ep<-ep*everything$R[tg]},
+             cat("attack went wrong ",everything$damage[i]," huh\n"))
+      deadunits<-ep%/%everything$hp[tg]
+      everything$units[tg]<-max(everything$units[tg]-deadunits,0)
+
+    }}
+  ### filter out all groups where everyone died
+  everything<-everything %>% rowwise %>% filter(units>0)
+  if(x%%10==0){cat(x,nrow(wc),nrow(virus),sum((everything%>%filter(type=="Imm"))$units),sum((everything%>%filter(type=="Inf"))$units),"\n")}
+  x<-x+1}
+  #### once there is nothing left,
+   winunits<-everything %>% group_by(type)%>%summarise(p1=sum(units))
+winunits}
+```
+
+
+
+
+Select target takes in a row & all of its enemies
+```{r}
+selecttarget<-function(agroup,targetlist){
+  newtarget<-NA
+  ### depending on the type of damage, figure out what the damage would be for every enemy
+  switch(agroup$damage,
+         "fire"={targetlist<-targetlist%>%rowwise%>%mutate(dealt=F*agroup$ep)},
+         "bludgeoning"={targetlist<-targetlist%>%rowwise%>%mutate(dealt=B*agroup$ep)},
+         "cold"={targetlist<-targetlist%>%rowwise%>%mutate(dealt=C*agroup$ep)},
+         "slashing"={targetlist<-targetlist%>%rowwise%>%mutate(dealt=S*agroup$ep)},
+         "radiation"={targetlist<-targetlist%>%rowwise%>%mutate(dealt=R*agroup$ep)},
+         cat(agroup$damage,"huh\n"))
+  ### arrange by damage, points, initiative (in that order)
+  targetlist<-targetlist%>%rowwise%>%
+    arrange(desc(attacker),desc(dealt),desc(ep),desc(initiative))
+  ### mark the top target.
+  if(targetlist$dealt[1]>0){
+    targetlist$attacker[1]<-agroup$typgrp
+    newtarget<-targetlist$typgrp[1]}
+  list(newtarget,targetlist)}
+```
+
+
+
+```{r}
+part1<-immunesystembattle(immsys)
+part1
 
 ```
 
-```{r}
-### Matrix
-diagnosticreport<-matrix(0,nrow=length(input),ncol=nchar(input[1]))
-for(i in 1:length(input)){diagnosticreport[i,]<-as.numeric(unlist(str_split(input[i],"")))}
 
+## Part 2
+
+Pretty much the same as part 1 with two changes - 
+1 - add the boost to everything
+2 - to check for stalemates (if nothing )
+
+```{r}
+boostbattle<-function(everything,boost){
+  ### while both teams still have groups
+  x<-1
+  ### boost
+  everything<-everything%>%rowwise%>%
+    mutate(attack=ifelse(type=="Imm",attack+boost,attack))
+  notstalemate<-T
+  while(all(c("Imm","Inf")%in%everything$type)&x<=Inf&notstalemate){
+    notstalemate<-F
+    ### find effective power
+    everything <- everything %>% rowwise %>% mutate(ep=units*attack) %>%
+      ### sort by effective power
+      arrange(desc(ep),desc(initiative))%>%
+      ### add (or reset) target & attacker
+      mutate(target=NA,attacker="empty")
+    wc<-everything %>% filter(type=="Imm")%>%rowwise%>%arrange(desc(ep),desc(initiative))
+    virus<-everything%>%filter(type=="Inf")
+    ### work from top to bottom -  immune group first for no particular reason 
+    ### this will give everything a target (if applicable) & identify its attacker (if applicable)
+    for(i in 1:nrow(wc)){
+      if(any(virus$attacker=="empty")){
+        st<-selecttarget(wc[i,],virus)
+        virus<-st[[2]]
+        wc$target[i]<-st[[1]]}}
+    ### reorder virus
+    virus<-virus %>%rowwise%>%arrange(desc(ep),desc(initiative))
+    for(i in 1:nrow(virus)){
+      if(any(wc$attacker=="empty")){
+        st<-selecttarget(virus[i,],wc)
+        wc<-st[[2]]
+        virus$target[i]<-st[[1]]}}
+    ### rejoin the teams
+    everything <- rbind(virus,wc) %>% rowwise %>% arrange(desc(initiative)) %>% select(-dealt)
+    ### attack if units > 
+#    for(i in 1:nrow(everything)){
+    #  cat(paste(everything[i,]%>%select(typgrp,ep,target)),"\n")}
+    for(i in 1:nrow(everything)){
+      ### if the group still has units & has a target
+      if(everything$units[i]>0&!is.na(everything$target[i])){
+        ### update ep in case this has been hit earlier in the round
+        ep<-everything$units[i]*everything$attack[i]
+        ### tg is the target line
+        tg<-which(everything$typgrp==everything$target[i])
+        ### alter ep depending on weakness & immunity
+        switch(everything$damage[i],
+               "fire"={ep<-ep*everything$F[tg]},
+               "bludgeoning"={ep<-ep*everything$B[tg]},
+               "cold"={ep<-ep*everything$C[tg]},
+               "slashing"={ep<-ep*everything$S[tg]},
+               "radiation"={ep<-ep*everything$R[tg]},
+               cat("attack went wrong ",everything$damage[i]," huh\n"))
+        deadunits<-ep%/%everything$hp[tg]
+        ### if at least one unit dies, this isn't a stalemate. If none do, stop.
+        if(deadunits>0){notstalemate<-T}
+        everything$units[tg]<-max(everything$units[tg]-deadunits,0)
+        
+      }}
+    ### filter out all groups where everyone died
+    everything<-everything %>% rowwise %>% filter(units>0)
+  #  if(x%%100==0){cat(x,nrow(wc),nrow(virus),sum((everything%>%filter(type=="Imm"))$units),sum((everything%>%filter(type=="Inf"))$units),"\n")}
+    x<-x+1}
+  #### once there is nothing left,
+  winunits<-everything %>% group_by(type)%>%summarise(p1=sum(units))
+  winunits}
 ```
 
 
-```{r,echo=FALSE}
-basicgraph<-ggplot()+
-  theme(axis.text.x = element_blank(),
-        axis.ticks.x = element_blank(),
-        axis.text.y = element_blank(),
-        axis.ticks.y = element_blank(),
-        axis.title.y = element_blank(),
-        axis.title.x = element_blank(),
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank(),
-        legend.position="none")+
-  scale_y_reverse()+
-  coord_fixed()
-basicgraph
+
+
+
+to find the min, trying to binary(ish) search - picking a random number between the limits:
+
+```{r}
+findboost<-function(unboosted){
+  ### find max 
+  fm<-1
+  maxfound<-FALSE
+  winunits<-NA
+  while(!maxfound){
+    cat("trying ",fm,"\n")
+    a<-boostbattle(unboosted,fm)
+    if(nrow(a)>1){
+      minboost<-fm
+      fm<-((fm+1)*2)-1
+      next}
+    if(a$type=="Imm"){
+      maxfound<-TRUE
+      maxboost<-fm
+      winunits<-a$p1
+      break}
+    minboost<-fm
+    fm<-((fm+1)*2)-1}
+  while(maxboost-minboost>1){
+    if(maxboost-minboost==2){tryboost<-maxboost-1}else{
+      tryboost<-sample((minboost+1):(maxboost-1),1)}
+    cat("range ",minboost,"-",maxboost," trying ",tryboost,"\n")
+    a<-boostbattle(unboosted,tryboost)
+    ### if stalemate, make the min two smaller, try again
+    if(nrow(a)>1){
+      minboost<-tryboost
+      next}else if(a$type=="Imm"){
+        maxboost<-tryboost
+        winunits<-a$p1
+      }else if(a$type=="Inf"){
+        minboost<-tryboost
+      }
+  }
+  cat(maxboost,"\n")
+  winunits}
+```
+
+```{r}
+part2<-findboost(immsys)
+part2
 ```
 

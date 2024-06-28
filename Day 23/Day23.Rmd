@@ -1,5 +1,5 @@
 ---
-title: "Day XX Notebook"
+title: "Day 23 Notebook"
 output: html_notebook
 ---
 
@@ -19,32 +19,144 @@ options(scipen = 999)
 ```
 
 ```{r}
-input<-read_lines("DayXXSample.txt")
-#input<-read_lines("../../AoCData/AOC2018/DayXX.txt")
+input<-read_lines("Day23Sample.txt")
+```
 
+
+```{r}
+nanobots<-as.data.frame(matrix(ncol=4,nrow=0))
+for(i in 1:length(input)){
+  nb<-input[i]
+  ### remove characters
+  nb<-str_remove_all(nb,"[^0-9 ,-]")
+  nb<-as.numeric(unlist(str_split(nb,",| ")))[-4]
+  nanobots<-rbind(nanobots,nb)
+}
+colnames(nanobots)<-c("x","y","z","r")
+#nanobots
+```
+
+
+```{r}
+inrange<-function(nbl){
+  strongest<-nbl%>%filter(r==max(r))
+  cat(paste(strongest))
+  nbl<-nbl%>%rowwise%>%
+    mutate(d=abs(x-strongest$x)+abs(y-strongest$y)+abs(z-strongest$z))%>%
+    mutate(ok=ifelse(d<=strongest$r,T,F))
+  results<-nbl%>%count(ok)
+results}
 ```
 
 ```{r}
-### Matrix
-diagnosticreport<-matrix(0,nrow=length(input),ncol=nchar(input[1]))
-for(i in 1:length(input)){diagnosticreport[i,]<-as.numeric(unlist(str_split(input[i],"")))}
-
+part1<-inrange(nanobots)
+part1
 ```
 
+## Part 2
 
-```{r,echo=FALSE}
-basicgraph<-ggplot()+
-  theme(axis.text.x = element_blank(),
-        axis.ticks.x = element_blank(),
-        axis.text.y = element_blank(),
-        axis.ticks.y = element_blank(),
-        axis.title.y = element_blank(),
-        axis.title.x = element_blank(),
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank(),
-        legend.position="none")+
-  scale_y_reverse()+
-  coord_fixed()
-basicgraph
+boxrange should take in a single point & range and a box & then determine if anywhere in the box is in range
+```{r}
+boxrange<-function(x,y,z,r,bx,by,bz){
+  if(x>=bx[1]&x<=bx[2]){minx<-0}else{minx<-min(abs(bx-x))}
+  if(y>=by[1]&y<=by[2]){miny<-0}else{miny<-min(abs(by-y))}
+  if(z>=bz[1]&z<=bz[2]){minz<-0}else{minz<-min(abs(bz-z))}
+  mind<-minx+miny+minz
+  br<-mind<=r
+br}
+```
+
+This will take in a list of nanobots and return closest of the points that are in range of the most nanobots
+1. Create a cube with sides that are a power of two
+2. Put into a prioritized queue.
+repeat:
+3. Pop the queue
+3a - if the box has fewer than the already known max, go back to 3
+4. if it's a 1x1x1, store the information if it's higher
+5. Divide the box into 8 smaller boxes
+6. push the smaller boxes onto the queue
+
+7. find the closest to 0 for the points that touch everything.
+
+
+```{r}
+findposition<-function(nbs){
+  ### make the starter box - because I want it to enclose everything AND be a power of two AND a cube
+  ### this gets the minimum length
+  sidelength<-max(max(nbs$x)-min(nbs$x),max(nbs$y)-min(nbs$y),max(nbs$z)-min(nbs$z))+2*max(nbs$r)
+  ### this gives something that is a power of two
+  sidelength<-2^ceiling(log(sidelength+2)/log(2))
+  ### creates a "box", min & max for each dimension and the number of observations
+  ### at the start, this is the total number of nanobots, because they're all inside the box
+  sbx<-list(c(min(nbs$x)-1-max(nbs$r),min(nbs$x)+sidelength-2-max(nbs$r)),
+            c(min(nbs$y)-1-max(nbs$r),min(nbs$y)+sidelength-2-max(nbs$r)),
+            c(min(nbs$z)-1-max(nbs$r),min(nbs$z)+sidelength-2-max(nbs$r)),length(nbs))
+  
+   pq<-priority_queue()
+   ### add to the queue - priority is the number touching
+   pq$push(sbx,length(nbs))
+   ### the number that's currently the max
+   maxbots<-0
+   ### list of places that might be valid, in case there needs to be a tie breaker
+   possibles<-list()
+   while(pq$size()>0){
+     bx<-pq$pop()
+     ### if this box isn't in range of at least as many boxes as the "max box",
+     ### then neither can any of the interior boxes - go to the next
+     ### i'm pretty sure I can break - but just in case
+     if(bx[[4]]<maxbots){next}
+     ### if down to a single cell then
+     if(bx[[1]][1]==bx[[1]][2]){
+       ### check to see if it is touching more than the currently found max (shouldn't happen - but)
+       if(bx[[4]]>maxbots){
+         ### this is the new possibles
+         possibles<-list(c(bx[[1]][1],bx[[2]][1],bx[[3]][1]))
+         ### and update the new max
+         maxbots<-bx[[4]]
+         ### otherwise, add this to the list of possibles
+         }else{possibles<-c(possibles,list(c(bx[[1]][1],bx[[2]][1],bx[[3]][1])))}
+       next}
+     ### otherwise, divide into 8 pieces
+     slminus1<-((bx[[1]][2]-bx[[1]][1]+1)/2)-1
+     smallx<-c(bx[[1]][1],bx[[1]][1]+slminus1)
+     bigx<-c(bx[[1]][2]-slminus1,bx[[1]][2])
+     smally<-c(bx[[2]][1],bx[[2]][1]+slminus1)
+     bigy<-c(bx[[2]][2]-slminus1,bx[[2]][2])
+     smallz<-c(bx[[3]][1],bx[[3]][1]+slminus1)
+     bigz<-c(bx[[3]][2]-slminus1,bx[[3]][2])
+     eights<-list(
+       list(smallx,smally,smallz),
+       list(smallx,smally,bigz),
+       list(smallx,bigy,smallz),
+       list(smallx,bigy,bigz),
+       list(bigx,smally,smallz),
+       list(bigx,smally,bigz),
+       list(bigx,bigy,smallz),
+       list(bigx,bigy,bigz))
+     ### find the counts for each piece
+     eightcounts<-sapply(eights,function(octant){
+       ct<-nanobots%>%rowwise%>%
+         mutate(inrn=boxrange(x,y,z,r,octant[[1]],octant[[2]],octant[[3]]))
+       ct<-sum(ct$inrn)
+       ct})
+     ### push those pieces into the queue
+     for(i in 1:8){
+       pq$push(append(eights[[i]],eightcounts[i]),eightcounts[i])}}
+   
+   ### when the queue is empty - 
+#   cat(maxbots,"\n")
+#   cat(paste(possibles),"\n")
+   ### find the one that's closest to 0
+   mds<-c()
+   for(i in 1:length(possibles)){
+     mds<-c(mds,sum(abs(possibles[[i]])))}
+   answer<-min(mds)
+   answer}
+```
+
+```{r}
+
+part2<-findposition(nanobots)
+part2
 ```
 

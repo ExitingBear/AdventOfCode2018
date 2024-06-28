@@ -1,13 +1,9 @@
 ---
-title: "Day XX Notebook"
+title: "Day 16 Notebook"
 output: html_notebook
 ---
 
 ```{r setup, include=FALSE}
-library(igraph)
-library(ggplot2)
-library(rgl)
-library(ggraph)
 library(reshape2)
 library(knitr)
 library(dplyr)
@@ -18,33 +14,214 @@ library(collections)
 options(scipen = 999)
 ```
 
+Day 16 is highly dependent on data, so the code is here, but I'm not running it.  (It runs with data.)
+
+
+```{r,eval=FALSE}
+input<-read_lines("DATA")
+```
+
+
 ```{r}
-input<-read_lines("DayXXSample.txt")
-#input<-read_lines("../../AoCData/AOC2018/DayXX.txt")
+t<-which(str_detect(input,"Before:"))
+sampleops<-list()
+for(i in t){
+  b<-as.numeric(unlist(str_split(str_squish(str_remove_all(input[i],"[^0-9 ]"))," ")))
+  oc<-as.numeric(unlist(str_split(input[i+1]," ")))
+  a<-as.numeric(unlist(str_split(str_squish(str_remove_all(input[i+2],"[^0-9 ]"))," ")))
+  l<-list(b,oc,a)
+  sampleops<-c(sampleops,list(l))}
 
 ```
+
+
+
+
+## Part 1
+
+First, I need to make the opcodes
+```{r}
+addr<-function(a,b,c,reg){
+  out<-reg
+  out[c+1]<-reg[a+1]+reg[b+1]
+  out}
+addi<-function(a,b,c,reg){
+  out<-reg
+  out[c+1]<-reg[a+1]+b
+  out}
+mulr<-function(a,b,c,reg){
+  out<-reg
+  out[c+1]<-reg[a+1]*reg[b+1]
+  out}
+muli<-function(a,b,c,reg){
+  out<-reg
+  out[c+1]<-reg[a+1]*b
+  out}
+banr<-function(a,b,c,reg){
+  out<-reg
+  out[c+1]<-bitwAnd(reg[a+1],reg[b+1])
+  out}
+bani<-function(a,b,c,reg){
+  out<-reg
+  out[c+1]<-bitwAnd(reg[a+1],b)
+  out}
+borr<-function(a,b,c,reg){
+  out<-reg
+  out[c+1]<-bitwOr(reg[a+1],reg[b+1])
+  out}
+bori<-function(a,b,c,reg){
+  out<-reg
+  out[c+1]<-bitwOr(reg[a+1],b)
+  out}
+setr<-function(a,b,c,reg){
+  out<-reg
+  out[c+1]<-reg[a+1]
+  out}
+seti<-function(a,b,c,reg){
+  out<-reg
+  out[c+1]<-a
+  out}
+gtir<-function(a,b,c,reg){
+  out<-reg
+  if(a>reg[b+1]){out[c+1]<-1}else{out[c+1]<-0}
+  out}
+gtri<-function(a,b,c,reg){
+  out<-reg
+  if(reg[a+1]>b){out[c+1]<-1}else{out[c+1]<-0}
+  out}
+gtrr<-function(a,b,c,reg){
+  out<-reg
+  if(reg[a+1]>reg[b+1]){out[c+1]<-1}else{out[c+1]<-0}
+  out}
+eqir<-function(a,b,c,reg){
+  out<-reg
+  if(a==reg[b+1]){out[c+1]<-1}else{out[c+1]<-0}
+  out}
+eqri<-function(a,b,c,reg){
+  out<-reg
+  if(reg[a+1]==b){out[c+1]<-1}else{out[c+1]<-0}
+  out}
+eqrr<-function(a,b,c,reg){
+  out<-reg
+  if(reg[a+1]==reg[b+1]){out[c+1]<-1}else{out[c+1]<-0}
+  out}
+```
+
 
 ```{r}
-### Matrix
-diagnosticreport<-matrix(0,nrow=length(input),ncol=nchar(input[1]))
-for(i in 1:length(input)){diagnosticreport[i,]<-as.numeric(unlist(str_split(input[i],"")))}
-
+oclist<-c("addr","addi","mulr","muli","banr","bani","borr","bori","setr","seti","gtir","gtri","gtrr","eqir","eqri","eqrr")
 ```
 
 
-```{r,echo=FALSE}
-basicgraph<-ggplot()+
-  theme(axis.text.x = element_blank(),
-        axis.ticks.x = element_blank(),
-        axis.text.y = element_blank(),
-        axis.ticks.y = element_blank(),
-        axis.title.y = element_blank(),
-        axis.title.x = element_blank(),
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank(),
-        legend.position="none")+
-  scale_y_reverse()+
-  coord_fixed()
-basicgraph
+Check each of the samples to see how many of the opcodes work
+```{r}
+samplematchcount<-function(s){
+  sm<-0
+  for(x in 1:length(s)){
+    ### for ease of use, resplit
+    b<-s[[x]][[1]]
+    i<-s[[x]][[2]]
+    a<-s[[x]][[3]]
+    ### check to see how many opcodes work
+    cnt<-sum(sapply(oclist,function(x){all(do.call(x,list(i[2],i[3],i[4],b))==a)}))
+    ### increment if the answer is more than 3
+    if(cnt>=3){sm<-sm+1}}
+  sm}
 ```
+
+```{r,eval=FALSE}
+part1<-samplematchcount(sampleops)
+part1
+```
+
+## Part 2
+
+
+```{r}
+
+opcodematcher<-function(s){
+  sm<-0
+  mdf<-as.data.frame(matrix(ncol=16,nrow=0))
+  opcd<-c()
+  for(x in 1:length(s)){
+    b<-s[[x]][[1]]
+    i<-s[[x]][[2]]
+    a<-s[[x]][[3]]
+    m<-sapply(oclist,function(x){all(do.call(x,list(i[2],i[3],i[4],b))==a)})
+    opcd<-c(opcd,i[1])
+    ### using the code from last time, but this time just dump it into a dataframe
+    mdf<-rbind(mdf,m)}
+  mdf<-cbind(opcd,mdf)
+  colnames(mdf)<-c("cdnum",oclist)
+  ### take the data.frame - determine where there are no falses for each code.
+  mdf<-mdf%>%group_by(cdnum)%>%summarise_all(all)
+  ### melt it into a simple two column frame
+  opnum<-melt(mdf,measure=2:17)%>%rowwise%>%filter(value==TRUE)%>%select(-value)
+  colnames(opnum)<-c("cdnum","cd")
+  x<-1
+  ### whittle down to a 1-to-1 mapping
+  while(nrow(opnum)>length(unique(opnum$cdnum))){
+    ### take possibility
+    xnum<-opnum$cdnum[x]
+    xcd<-opnum$cd[x]
+    ### if that column can only be one field
+    if(length(which(opnum$cdnum==xnum))==1){
+      ### check to see if any other columns are marked as could be that field.
+      ### if so, remove those lines (because that field is now associated with the column uniquely)
+      if(length(which(opnum$cd==xcd))>1){
+        opnum<-opnum %>% rowwise %>%
+          ### mark the rows to be removed
+          mutate(bye=ifelse(cdnum!=xnum&&cd==xcd,F,T))%>%
+          ### filter the rows
+          filter(bye)%>%
+          ### remove the marker
+          select (-bye)}}
+    ### get ready to look at a new row.
+    x<-x+1
+    if(x>nrow(opnum)){x<-x-nrow(opnum)}}
+  opnum<-opnum%>%arrange(cdnum)
+  opnum}
+
+```
+
+```{r,eval=FALSE}
+### change that to a vector
+opdecode<-opcodematcher(sampleops)
+opdecode<-as.vector(opdecode$cd)
+opdecode
+```
+Show the mapping is correct
+
+```{r,eval=FALSE}
+all(sapply(sampleops,function(x){
+  b<-x[[1]]
+  i<-x[[2]]
+  a<-x[[3]]
+  
+  y<-do.call(opdecode[i[1]+1],list(i[2],i[3],i[4],b))
+  y<-all(y==a)
+  
+y}))
+```
+Get the input for the the registers
+
+```{r,eval=FALSE}
+t<-tail(which(str_detect(input,"After:")),1)
+reginst<-input[-(1:t)]
+reginst<-reginst[which(reginst!="")]
+reginst<-lapply(reginst,function(x){as.numeric(unlist(str_split(x," ")))})
+```
+
+Run the instructions when the registers start at 0.
+
+```{r,eval=FALSE}
+reg<-c(0,0,0,0)
+for(i in 1:length(reginst)){
+  ri<-reginst[[i]]
+  reg<-do.call(opdecode[ri[1]+1],list(ri[2],ri[3],ri[4],reg))}
+reg
+part2<-reg[1]
+part2
+```
+
 
