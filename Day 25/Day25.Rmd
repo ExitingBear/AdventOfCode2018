@@ -1,12 +1,11 @@
 ---
-title: "Day XX Notebook"
+title: "Day 25 Notebook"
 output: html_notebook
 ---
 
 ```{r setup, include=FALSE}
 library(igraph)
 library(ggplot2)
-library(rgl)
 library(ggraph)
 library(reshape2)
 library(knitr)
@@ -18,33 +17,52 @@ library(collections)
 options(scipen = 999)
 ```
 
-```{r}
-input<-read_lines("DayXXSample.txt")
-#input<-read_lines("../../AoCData/AOC2018/DayXX.txt")
 
-```
+It's a graph!!!!!!!!
 
 ```{r}
-### Matrix
-diagnosticreport<-matrix(0,nrow=length(input),ncol=nchar(input[1]))
-for(i in 1:length(input)){diagnosticreport[i,]<-as.numeric(unlist(str_split(input[i],"")))}
+ input<-read_lines("Day25Sample.txt")
+# input2<-read_lines("Day25Sample2.txt")
+# input3<-read_lines("Day25Sample3.txt")
+# input4<-read_lines("Day25Sample4.txt")
 
 ```
 
-
-```{r,echo=FALSE}
-basicgraph<-ggplot()+
-  theme(axis.text.x = element_blank(),
-        axis.ticks.x = element_blank(),
-        axis.text.y = element_blank(),
-        axis.ticks.y = element_blank(),
-        axis.title.y = element_blank(),
-        axis.title.x = element_blank(),
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank(),
-        legend.position="none")+
-  scale_y_reverse()+
-  coord_fixed()
-basicgraph
+```{r}
+starchart<-list()
+for(i in 1:length(input)){
+  star<-as.numeric(unlist(str_split(input[i],",")))
+  starchart<-c(starchart,list(star))}
 ```
 
+turn a list of stars into a map
+```{r}
+mapthestars<-function(sc){
+  staredge<-matrix(ncol=2,nrow=0)
+  #### do a simple loop so that every point gets included
+  for(i in 1:length(sc)){
+    staredge<-rbind(staredge,c(str_flatten(starchart[[i]],collapse=" "),
+                               str_flatten(starchart[[i]],collapse=" ")))}
+  #### graph the actual points that connect to each other
+  for(i in 1:(length(sc)-1)){
+    for(j in (i+1):length(sc)){
+      if(sum(abs(sc[[i]]-sc[[j]]))<=3){
+        staredge<-rbind(staredge,c(str_flatten(starchart[[i]],collapse=" "),
+                                   str_flatten(starchart[[j]],collapse=" ")))}}}
+  starmap<-simplify(graph_from_edgelist(staredge,directed=FALSE))
+  cat("There are ",count_components(starmap),"constellations.\n")
+  starmap}
+```
+
+
+```{r}
+sm<-mapthestars(starchart)
+```
+
+
+```{r}
+ggraph(sm,layout="kk")+
+  geom_edge_link()+
+  geom_node_point()
+
+```

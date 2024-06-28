@@ -1,13 +1,12 @@
 ---
-title: "Day XX Notebook"
+title: "Day 18 Notebook"
 output: html_notebook
 ---
 
 ```{r setup, include=FALSE}
-library(igraph)
+library(gganimate)
+library(gifski)
 library(ggplot2)
-library(rgl)
-library(ggraph)
 library(reshape2)
 library(knitr)
 library(dplyr)
@@ -19,21 +18,105 @@ options(scipen = 999)
 ```
 
 ```{r}
-input<-read_lines("DayXXSample.txt")
-#input<-read_lines("../../AoCData/AOC2018/DayXX.txt")
+#input<-read_lines("Day18Sample.txt")
+input<-read_lines("../../AoCData/AOC2018/Day18.txt")
+### Matrix
+landscape<-matrix(0,nrow=length(input)+2,ncol=nchar(input[1])+2)
 
+lsc<-lapply(input,function(x){
+x<-unlist(str_split(x,""))
+x[which(x==".")]<-"0"
+x[which(x=="|")]<-"1"
+x[which(x=="#")]<-"10"
+x<-as.numeric(x)})
+
+for(i in 1:length(lsc)){landscape[i+1,]<-c(0,unlist(lsc[[i]]),0)}
 ```
+## Part 1
 
 ```{r}
-### Matrix
-diagnosticreport<-matrix(0,nrow=length(input),ncol=nchar(input[1]))
-for(i in 1:length(input)){diagnosticreport[i,]<-as.numeric(unlist(str_split(input[i],"")))}
-
+forestgrow<-function(lsc,reps){
+  r<-1
+  while(r<=reps){
+    nextforest<-matrix(NA,ncol=ncol(lsc),nrow=nrow(lsc))
+    nextforest[1,]<-0
+    nextforest[nrow(nextforest),]<-0
+    nextforest[,1]<-0
+    nextforest[,ncol(nextforest)]<-0
+    for(i in 2:(nrow(lsc)-1)){
+      for(j in 2:(ncol(lsc)-1)){
+        nine<-sum(lsc[(i-1):(i+1),(j-1):(j+1)])
+        switch(as.character(lsc[i,j]),
+               "0"={if(nine%%10>=3){nextforest[i,j]<-1}else{nextforest[i,j]<-0}},
+               "1"={if(nine>30){nextforest[i,j]<-10}else{nextforest[i,j]<-1}},
+               "10"={if(nine%%10>=1&nine>=20){nextforest[i,j]<-10}else{nextforest[i,j]<-0}},
+               cat("something is wrong\n"))
+                #cat(i,j,lsc[i,j], nine,nextforest[i,j],"\n")
+                }}
+    lsc<-nextforest
+    r<-r+1}
+  trees<-length(which(lsc==1))
+  lumberyards<-length(which(lsc==10))
+  resources<-trees*lumberyards
+  list(trees,lumberyards,resources,lsc)}
 ```
 
 
-```{r,echo=FALSE}
-basicgraph<-ggplot()+
+```{r}
+p1<-forestgrow(landscape,10)
+part1<-p1[[3]]
+part1
+```
+## Part 2
+
+Depends heavily on the data, the real data has the pattern below
+Start by graphing to see if there's a pattern for something that looks like a pattern - 
+
+```{r,eval=FALSE}
+forestgrowanimation<-function(lsc,reps){
+  r<-1
+  anim<-as.data.frame(matrix(ncol=4,nrow=0))
+  cel<-melt(lsc)
+  cel<-cbind(cel,rep(0,nrow(cel)))
+  names(cel)<-c("y","x","resources","minutes")
+  anim<-rbind(anim,cel)
+  names(cel)<-c("y","x","resources","minutes")
+
+  while(r<=reps){
+    nextforest<-matrix(NA,ncol=ncol(lsc),nrow=nrow(lsc))
+    nextforest[1,]<-0
+    nextforest[nrow(nextforest),]<-0
+    nextforest[,1]<-0
+    nextforest[,ncol(nextforest)]<-0
+    for(i in 2:(nrow(lsc)-1)){
+      for(j in 2:(ncol(lsc)-1)){
+        nine<-sum(lsc[(i-1):(i+1),(j-1):(j+1)])
+        switch(as.character(lsc[i,j]),
+               "0"={if(nine%%10>=3){nextforest[i,j]<-1}else{nextforest[i,j]<-0}},
+               "1"={if(nine>30){nextforest[i,j]<-10}else{nextforest[i,j]<-1}},
+               "10"={if(nine%%10>=1&nine>=20){nextforest[i,j]<-10}else{nextforest[i,j]<-0}},
+               cat("something is wrong\n"))
+                #cat(i,j,lsc[i,j], nine,nextforest[i,j],"\n")
+                }}
+    lsc<-nextforest
+    
+  cel<-melt(lsc)
+  cel<-cbind(cel,rep(r,nrow(cel)))
+    names(cel)<-c("y","x","resources","minutes")
+
+      anim<-rbind(anim,cel)
+    r<-r+1}
+  trees<-length(which(lsc==1))
+  lumberyards<-length(which(lsc==10))
+  resources<-trees*lumberyards
+  anim}
+mkgraph<-forestgrowanimation(landscape,599)
+mkgraph$resources<-as.character(mkgraph$resources)
+
+resourcecolors<-c("0"="#6F4E37","10"="#999999","1"="#00AA00")
+lumberfield<-ggplot()+
+  scale_fill_manual(values=resourcecolors)+
+  geom_tile(data=mkgraph,aes(x=x,y=y,fill=resources))+
   theme(axis.text.x = element_blank(),
         axis.ticks.x = element_blank(),
         axis.text.y = element_blank(),
@@ -44,7 +127,50 @@ basicgraph<-ggplot()+
         panel.grid.minor = element_blank(),
         legend.position="none")+
   scale_y_reverse()+
-  coord_fixed()
-basicgraph
+  coord_fixed()+
+  transition_states(minutes,wrap=FALSE)
+
+treegrowth<-animate(lumberfield,nframes=600,renderer = gifski_renderer())
+treegrowth
 ```
 
+![Yes, there's a pattern](day18.gif)
+
+
+
+
+
+
+
+
+
+
+
+
+Which looks like it begins repeating after a while - to figure out how often, looking for the minimums - 
+
+```{r,eval=FALSE}
+lowestpoints<-c(FALSE,sapply(2:999,function(x){if(first1000[x]<first1000[x-1]&&first1000[x]<first1000[x+1]){TRUE}else{FALSE}}),FALSE)
+first1000[lowestpoints]
+```
+It looks like a repeat at 163430
+```{r,eval=FALSE}
+which(first1000==163430)
+```
+This shows that the repeat is every 28 - shown again here:
+```{r,eval=FALSE}
+diff(first1000[400:500],28)
+```
+So by repeat 500, this is on a 28 minute cycle
+
+Which means that if it goes to 1000000000%%28+560 (560 is high enough and as a multiple of 28 will be basically a "reset")
+
+```{r,eval=FALSE}
+1000000000%%28+560
+```
+
+```{r,eval=FALSE}
+p2<-forestgrow(landscape,(1000000000%%28+560))
+part2<-p2[[3]]
+part2
+```

@@ -1,14 +1,9 @@
 ---
-title: "Day XX Notebook"
+title: "Day 21 Notebook"
 output: html_notebook
 ---
 
 ```{r setup, include=FALSE}
-library(igraph)
-library(ggplot2)
-library(rgl)
-library(ggraph)
-library(reshape2)
 library(knitr)
 library(dplyr)
 library(stringr)
@@ -18,33 +13,255 @@ library(collections)
 options(scipen = 999)
 ```
 
+```{r,eval=FALSE}
+input<-read_lines("DATA")
+instructs<-input[2:length(input)]
+```
+
+As all of this dpends on the data, it isn't run here - 
+
+
+## Part 1
+
+First, I need to rewrite bitwise & and or so that they don't collapse
+
 ```{r}
-input<-read_lines("DayXXSample.txt")
-#input<-read_lines("../../AoCData/AOC2018/DayXX.txt")
+andbit<-function(a,b){
+  bina<-c()
+  for(x in 63:0){
+    bina<-c(bina,a%/%(2^x))
+    a<-a%%(2^x)}
 
+  binb<-c()
+  for(x in 63:0){
+    binb<-c(binb,b%/%(2^x))
+    b<-b%%(2^x)}
+  c<-as.numeric(bina & binb)
+
+  d<-0
+  for(i in 1:length(c)){
+    d<-2*d+c[i]}
+d}
+
+orbit<-function(a,b){
+  bina<-c()
+  for(x in 63:0){
+    bina<-c(bina,a%/%(2^x))
+    a<-a%%(2^x)}
+
+  binb<-c()
+  for(x in 63:0){
+    binb<-c(binb,b%/%(2^x))
+    b<-b%%(2^x)}
+  
+  c<-as.numeric(bina|binb)
+
+  d<-0
+  for(i in 1:length(c)){
+    d<-2*d+c[i]}
+d}
 ```
+
+
+Then pull the remainder of the codes for the earlier day:
 
 ```{r}
-### Matrix
-diagnosticreport<-matrix(0,nrow=length(input),ncol=nchar(input[1]))
-for(i in 1:length(input)){diagnosticreport[i,]<-as.numeric(unlist(str_split(input[i],"")))}
+addr<-function(a,b,c,reg){
+  out<-reg
+  out[c+1]<-reg[a+1]+reg[b+1]
+  out}
+addi<-function(a,b,c,reg){
+  out<-reg
+  out[c+1]<-reg[a+1]+b
+  out}
+mulr<-function(a,b,c,reg){
+  out<-reg
+  out[c+1]<-reg[a+1]*reg[b+1]
+  out}
+muli<-function(a,b,c,reg){
+  out<-reg
+  out[c+1]<-reg[a+1]*b
+  out}
+banr<-function(a,b,c,reg){
+  out<-reg
+  out[c+1]<-andbit(reg[a+1],reg[b+1])
+  out}
+bani<-function(a,b,c,reg){
+  out<-reg
+  out[c+1]<-andbit(reg[a+1],b)
+  out}
+borr<-function(a,b,c,reg){
+  out<-reg
+  out[c+1]<-orbit(reg[a+1],reg[b+1])
+  out}
+bori<-function(a,b,c,reg){
+  out<-reg
+  out[c+1]<-orbit(reg[a+1],b)
+  out}
+setr<-function(a,b,c,reg){
+  out<-reg
+  out[c+1]<-reg[a+1]
+  out}
+seti<-function(a,b,c,reg){
+  out<-reg
+  out[c+1]<-a
+  out}
+gtir<-function(a,b,c,reg){
+  out<-reg
+  if(a>reg[b+1]){out[c+1]<-1}else{out[c+1]<-0}
+  out}
+gtri<-function(a,b,c,reg){
+  out<-reg
+  if(reg[a+1]>b){out[c+1]<-1}else{out[c+1]<-0}
+  out}
+gtrr<-function(a,b,c,reg){
+  out<-reg
+  if(reg[a+1]>reg[b+1]){out[c+1]<-1}else{out[c+1]<-0}
+  out}
+eqir<-function(a,b,c,reg){
+  out<-reg
+  if(a==reg[b+1]){out[c+1]<-1}else{out[c+1]<-0}
+  out}
+eqri<-function(a,b,c,reg){
+  out<-reg
+  if(reg[a+1]==b){out[c+1]<-1}else{out[c+1]<-0}
+  out}
+eqrr<-function(a,b,c,reg){
+  out<-reg
+  if(reg[a+1]==reg[b+1]){out[c+1]<-1}else{out[c+1]<-0}
+  out}
+```
+
+
+
+Part 1 is to find the value for register 0 that escapes the loop:
+
+The only line that uses register 0 is line 28 - if register 5 is equal to register 0, it ends.  So, do a slight change to the run program to display the registers when it hits line 18.
+
+```{r,eval=FALSE}
+
+runprogram<-function(instructions,ipreg,r0start,forcestop){
+  reg<-c(r0start,0,0,0,0,0)
+  ip<-reg[ipreg]
+  while(ip<length(instructions)){
+    reg[ipreg]<-ip
+    inst<-instructions[ip+1]
+    ### leave in to display line 28
+    if(ip==28){
+    cat(" ip=",ip,":",reg,"->")
+    cat(" ",inst," -> ")}
+    inst<-unlist(str_split(inst," "))
+    in2<-as.numeric(inst[[2]])
+    in3<-as.numeric(inst[[3]])
+    in4<-as.numeric(inst[[4]])
+    reg<-do.call(inst[[1]],list(in2,in3,in4,reg))
+    if(ip==28){
+    cat(reg,"\n")
+      if(forcestop){
+      break}}
+    ip<-reg[ipreg]
+    ip<-ip+1}
+reg}
+```
+
+
+```{r,eval=FALSE}
+### run program takes in the instructions, the ip register to handle jumps, the start for register 0
+### and whether or not to force a stop
+runprogram(instructs,2,0,TRUE)
+```
+So, it looks like this will stop if reg0 is 103548
+
+```{r,eval=FALSE}
+runprogram(instructs,2,103548,FALSE)
+
+```
+Part 1 is 103548.
+
+## Part 2
+
+For part 2, figure out what the code is doing:
+
+
+| # | instruction | restated | notes |
+|:------|:-----|:--------|:--------|
+| 0 | seti 123 0 4 | reg[5]<-123 |  from 0 to 5 does nothing useful for this problem | 
+| 1 | bani 4 456 4 | reg[5]<-andbit(reg[5],456) | | 
+| 2 | eqri 4 72 4 | if(reg[5]==72){reg[5]<-1}else{reg[5]<-0} | | 
+| 3 | addr 4 1 1 | reg[2]<-reg[2]+reg[5] | | 
+| 4 | seti 0 0 1 | reg[2]<-0 |  | 
+| 5 | seti 0 2 4 | reg[5]<-0 |  | 
+| 6 | bori 4 65536 3 | reg[4]<-orbit(reg[5],65536) | if reg[5]%%131072>65536, add 65536 | 
+| 7 | seti 10552971 1 4 | reg[5]<-10552971 |  | 
+| 8 | bani 3 255 5 | reg[6]<-andbit(reg[4],255) | finds reg[4]%%256 | 
+| 9 | addr 4 5 4 | reg[5]<-reg[5]+reg[6] |  | 
+| 10 | bani 4 16777215 4 | reg[5]<-andbit(reg[5],16777215) | finds reg[5]%%16777216   | 
+| 11 | muli 4 65899 4 | reg[5]<-reg[5]*65899 |  | 
+| 12 | bani 4 16777215 4 | reg[5]<-andbit(reg[5],16777215) | finds reg[5]%%16777216   | 
+| 13 | gtir 256 3 5 | if(256>reg[4]){reg[6]<-1}else{reg[6]<-0} | checks for an exit to the loop  | 
+| 14 | addr 5 1 1 | reg[2]<-reg[2]+reg[6] |  | 
+| 15 | addi 1 1 1 | reg[2]<-reg[2]+1 | jump to 17 | 
+| 16 | seti 27 7 1 | reg[2]<-27 | jump to 28 | 
+| 17 | seti 0 1 5 | reg[6]<-0 |  |
+| 18 | addi 5 1 2 | reg[3]<-reg[6]+1 |  | 
+| 19 | muli 2 256 2 | reg[3]<-reg[3]*256 | increments reg[3] by 256 | 
+| 20 | gtrr 2 3 2 | if(reg[3]>reg[4]){reg[3]<-1}else{reg[3]<-0} | if reg[3] > 65536 break this loop    | 
+| 21 | addr 2 1 1 | reg[2]<-reg[2]+reg[3] |  | 
+| 22 | addi 1 1 1 | reg[2]<-reg[2]+1 |  | 
+| 23 | seti 25 0 1 | reg[2]<-25 | jump to line 26   | 
+| 24 | addi 5 1 5 | reg[6]<-reg[6]+1 |  jump to line 6 | 
+| 25 | seti 17 2 1 | reg[2]<-17 | close the 18-25 loop | 
+| 26 | setr 5 7 3 | reg[4]<-reg[6] |  | 
+| 27 | seti 7 8 1 | reg[2]<-7 | jump to line 8 | 
+| 28 | eqrr 4 0 5 | if(reg[5]==reg[1]){reg[6]<-1}else{reg[6]<-0} | if reg[5]==reg[1], exit the program | 
+| 29 | addr 5 1 1 | reg[2]<-reg[2]+reg[6] |  | 
+| 30 | seti 5 0 1 | reg[2]<-5 | jump to line 6 | 
+
+
+
+5 rows of setup that does absolutely nothing useful 
+So, three loops - the 6-30 loop, the 8-27 loop and the 18-25 loop
+
+Rewriting it looks like this - witha slight change: collecting every time that it hits line 28 and storing that value until it repeats:
+
+```{r,eval=FALSE}
+rewriteprogram<-function(r0start){
+  reg<-c(r0start,0,0,0,0,0)
+  fc<-c()
+  while(TRUE){  ###6-30 loop
+    if(reg[5]%%131072<65536){reg[4]<-reg[5]+65536}else{reg[4]<-reg[5]}
+    reg[5]<-10552971
+    while(TRUE){ ###8-27 loop
+      reg[6]<-reg[4]%%256
+      reg[5]<-reg[5]+reg[6]
+      reg[5]<-reg[5]%%16777216
+      reg[5]<-reg[5]*65899
+      reg[5]<-reg[5]%%16777216
+      if(reg[4]<256){break}
+      reg[6]<-0
+      while(TRUE) { #18-25 loop 
+        if(((reg[6]+1)*256)>reg[4]){
+          break}
+        reg[6]<-reg[6]+1}
+      reg[4]<-reg[6]}
+    if(reg[1]==reg[5]){break}else{
+      if(reg[5]%in%fc){
+        return(c(fc,reg[5]))
+        }else{
+          fc<-c(fc,reg[5])}
+      }}
+  reg}
 
 ```
 
 
-```{r,echo=FALSE}
-basicgraph<-ggplot()+
-  theme(axis.text.x = element_blank(),
-        axis.ticks.x = element_blank(),
-        axis.text.y = element_blank(),
-        axis.ticks.y = element_blank(),
-        axis.title.y = element_blank(),
-        axis.title.x = element_blank(),
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank(),
-        legend.position="none")+
-  scale_y_reverse()+
-  coord_fixed()
-basicgraph
+Because it appends the first repeat - the answer is the next to last time it hit line 28 - this isn't very fast, but it works.
+```{r,eval=FALSE}
+part2<-rewriteprogram(0)
+part2<-tail(part2,2)[1]
+part2
 ```
+
+
+
 
